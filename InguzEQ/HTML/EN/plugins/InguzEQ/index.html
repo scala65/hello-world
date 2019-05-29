@@ -1,0 +1,686 @@
+[%- pagetitle = 'PLUGIN_INGUZEQ_MODULEDESC' | string; pageicon = 'PLUGIN_INGUZEQ_MODULEDESC' -%]
+[%- pwd_list = BLOCK -%]/
+	<a href="[% webroot %]plugins/InguzEQ/index.html?player=[% player | uri %]">
+		[% "PLUGIN_INGUZEQ_DISPLAYNAME" | string %]
+	</a>
+[% END -%]
+[% PROCESS pageheader.html %]
+
+<!--
+	Settings page
+	Part of the InguzEQ plugin, http://inguzaudio.com/EQ/
+	This file is licensed to you under the terms described in "Plugin.pm"
+
+	Copyright (c) 2006-2009 by Hugh Pyle, inguzaudio.com, and contributors.
+-->
+
+<!-- Script for the model -->
+<script type="text/javascript" src="/html/prototype.js"></script>
+<script type="text/javascript" src="Silverlight.js"></script>
+<script type="text/javascript" src="Model.js"></script>
+<script type="text/javascript" src="Scene.js"></script>
+<script type="text/javascript">
+
+// Highlighter
+
+function highlightSetting(el, valid)
+{
+	el = Ext.get(el.id);
+	if (el)
+	{
+		el.highlight(valid ? '99ff99' : 'ffcccc');
+		if (valid)
+			el.replaceClass('invalid', 'valid');
+		else
+			el.replaceClass('valid', 'invalid');
+	}
+}
+
+
+// Up/down for regular numeric settings
+
+function up(el)
+{
+	if(!el) return;
+	var getfn = "Get" + el.id.substr(el.id.indexOf("_")+1);
+	var setfn = "Set" + el.id.substr(el.id.indexOf("_")+1);
+	if(typeof(_model[getfn])=="function" && typeof(_model[setfn])=="function")
+	{
+		var inc = parseFloat(el.getAttribute("inc"));
+		var v = _model[getfn]() + inc;
+		if( inc<1 ) v=parseFloat(v.toFixed(-Math.log(inc)));
+		_model[setfn]( v, true, function(bOK){highlightSetting(el, bOK)} );
+	}
+}
+function dn(el)
+{
+	if(!el) return;
+	var getfn = "Get" + el.id.substr(el.id.indexOf("_")+1);
+	var setfn = "Set" + el.id.substr(el.id.indexOf("_")+1);
+	if(typeof(_model[getfn])=="function" && typeof(_model[setfn])=="function")
+	{
+		var inc = parseFloat(el.getAttribute("inc"));
+		var v = _model[getfn]() - inc;
+		if( inc<1 ) v=parseFloat(v.toFixed(-Math.log(inc)));
+		_model[setfn]( v, true, function(bOK){highlightSetting(el, bOK)} );
+	}
+}
+
+// Up/down for number of bands
+
+function ub(el)
+{
+	if(!el) return;
+	var v = _model.GetBands();
+	// Acceptable values are 2,3,5,9,15,31
+	if(v<=1) v=2;
+	else if(v<=2) v=3;
+	else if(v<=3) v=5;
+	else if(v<=5) v=9;
+	else if(v<=9) v=15;
+	else v=31;
+	_model.SetBands( v, true, function(bOK){highlightSetting(el, bOK)} );
+}
+function db(el)
+{
+	if(!el) return;
+	var v = _model.GetBands();
+	// Acceptable values are 2,3,5,9,15,31
+	if( v>=31 ) v=15;
+	else if(v>=15) v=9;
+	else if(v>=9) v=5;
+	else if(v>=5) v=3;
+	else v=2;
+	_model.SetBands( v, true, function(bOK){highlightSetting(el, bOK)} );
+}
+
+// Up/down for EQ values
+
+function ue(el)
+{
+	if(!el) return;
+	var pt = _model.GetPoint( el.id );
+	if(pt)
+	{
+		var inc = parseFloat( el.getAttribute("inc") );
+		var v = pt.Gain + inc;
+		if( inc<1 ) v=parseFloat(v.toFixed(-Math.log(inc)));
+		pt.Gain = v;
+		_model.SetPoint( el.id, pt, true, function(bOK){highlightSetting(el, bOK)} );
+	}
+}
+function de(el)
+{
+	if(!el) return;
+	var pt = _model.GetPoint( el.id );
+	if(pt)
+	{
+		var inc = parseFloat( el.getAttribute("inc") );
+		var v = pt.Gain - inc;
+		if( inc<1 ) v=parseFloat(v.toFixed(-Math.log(inc)));
+		pt.Gain = v;
+		_model.SetPoint( el.id, pt, true, function(bOK){highlightSetting(el, bOK)} );
+	}
+}
+
+// Load a filter or preset or set Ambisonic decode style
+
+function setf(el)
+{
+	if(!el) return;
+	var sType = el.id.substr(el.id.indexOf("_")+1);
+
+	var sval = "";
+	var ctrl = document.getElementById("sel_"+sType);
+	if( ctrl )
+	{
+		for( var j=0; j<ctrl.options.length; j++ )
+		{
+			var elo = ctrl.options[j];
+			if( elo.selected )
+			{
+				sval = elo.value;
+				break;
+			}
+		}
+	}
+
+	var setfn = "Set" + sType;
+	if(typeof(_model[setfn])=="function")
+	{
+		_model[setfn]( sval, true, function(bOK){highlightSetting(el, bOK)} );
+	}
+}
+
+// Save-As Preset
+
+function savp(el)
+{
+	if(!el) return;
+	var sType = el.id.substr(el.id.indexOf("_")+1);
+
+	var sval = "";
+	var ctrl = document.getElementById("edt_"+sType);
+	if( ctrl )
+	{
+		sval = ctrl.value;
+	}
+
+	var setfn = "Set" + sType;
+	if(typeof(_model[setfn])=="function")
+	{
+		_model[setfn]( sval, true, function(bOK){highlightSetting(el, bOK)} );
+	}
+}
+
+
+
+function resizeContainer()
+{
+	// Resize the plugin host to 16:9 aspect ratio
+	var host = $('SilverlightPlugInHost');
+	if(host)
+	{
+		host.style.height = 9 * host.offsetWidth / 16;
+	}
+}
+
+function doLoad()
+{
+	try
+	{
+		resizeContainer();
+		createSilverlightControl();
+	}
+	catch(e)
+	{
+		alert("Cannot initialize Silverlight: " + e.message);
+	}
+}
+</script>
+	[% WRAPPER settingSection onmouseover="onHTMLMouseOverBody()" %]
+
+	<!-- the style-police -->
+	<div style="display:none">
+	<input type="button" class="stdclick" name="csniff1"></input>
+	</div>
+
+	<!-- silverlight central -->
+	<table style="width:100%;padding:0" zzz_onresize="resizeContainer()">
+		<tr><td>
+			<div id="SilverlightPlugInHost" style="margin-right:20px; height:200px; width:95%;"></div>
+		</td></tr>
+	</table>
+
+	<!-- settings fields -->
+
+	[% WRAPPER settingSection %]&nbsp;
+		[% WRAPPER settingGroup title="" %][% END %]
+
+		<div  id="control_Bands">
+			<span class="songInfoTitle">[% "PLUGIN_INGUZEQ_EQUALIZER" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="db(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ub(this.parentNode.parentNode)" />
+				<span id="val_Bands"></span>[% "PLUGIN_INGUZEQ_NBAND" | string %]
+			</span>
+		</div>
+	[% END %]
+
+
+	[% WRAPPER settingSection %]&nbsp;
+		[% WRAPPER settingGroup title="PLUGIN_INGUZEQ_HTML_EQ" %][% END %]
+
+		<div style="display:none" id="control_EQ_0" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_0" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_0"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_1" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_1" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_1"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_2" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_2" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_2"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_3" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_3" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_3"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_4" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_4" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_4"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_5" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_5" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_5"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_6" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_6" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_6"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_7" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_7" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_7"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_8" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_8" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_8"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_9" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_9" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_9"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_10" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_10" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_10"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_11" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_11" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_11"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_12" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_12" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_12"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_13" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_13" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_13"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_14" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_14" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_14"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_15" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_15" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_15"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_16" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_16" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_16"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_17" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_17" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_17"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_18" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_18" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_18"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_19" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_19" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_19"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_20" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_20" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_20"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_21" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_21" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_21"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_22" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_22" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_22"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_23" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_23" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_23"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_24" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_24" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_24"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_25" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_25" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_25"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_26" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_26" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_26"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_27" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_27" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_27"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_28" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_28" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_28"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_29" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_29" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_29"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div style="display:none" id="control_EQ_30" inc="0.1">
+			<span class="songInfoTitle"><span id="freq_EQ_30" /></span>&nbsp;[% "PLUGIN_INGUZEQ_HERTZ" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="de(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="ue(this.parentNode.parentNode)" />
+				<span id="gain_EQ_30"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+	[% END %]
+
+	[% WRAPPER settingSection %]&nbsp;
+		[% WRAPPER settingGroup title="PLUGIN_INGUZEQ_HTML_AUDIO" %][% END %]
+
+		<div style="display:none" id="control_Flatness" inc="1">
+			<span class="songInfoTitle"><a href="http://inguzaudio.com/usage/plugin/flatness/" target="_new">[% "PLUGIN_INGUZEQ_FLATNESS" | string %]</a></span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="dn(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="up(this.parentNode.parentNode)" />
+				<span id="val_Flatness"></span>&nbsp;
+			</span>
+		</div>
+
+		<div id="control_Quietness" inc="1">
+			<span class="songInfoTitle"><a href="http://inguzaudio.com/usage/plugin/quietness/" target="_new">[% "PLUGIN_INGUZEQ_QUIETNESS" | string %]</a></span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="dn(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="up(this.parentNode.parentNode)" />
+				<span id="val_Quietness"></span>&nbsp;
+			</span>
+		</div>
+
+		<div id="control_Balance" inc="0.1">
+			<span class="songInfoTitle"><a href="http://inguzaudio.com/usage/plugin/balance/" target="_new">[% "PLUGIN_INGUZEQ_BALANCE" | string %]</a></span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="dn(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="up(this.parentNode.parentNode)" />
+				<span id="val_Balance"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+
+		<div id="control_Width" inc="0.1">
+			<span class="songInfoTitle"><a href="http://inguzaudio.com/usage/plugin/width/" target="_new">[% "PLUGIN_INGUZEQ_WIDTH" | string %]</a></span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="dn(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="up(this.parentNode.parentNode)" />
+				<span id="val_Width"></span>&nbsp;[% "PLUGIN_INGUZEQ_DECIBELS" | string %]
+			</span>
+		</div>
+	[% END %]
+
+	[% WRAPPER settingSection %]&nbsp;
+		[% WRAPPER settingGroup title="PLUGIN_INGUZEQ_HTML_FILTERS" %][% END %]
+
+		<div id="control_Filter">
+			<span class="songInfoTitle"><a href="http://inguzaudio.com/usage/plugin/settings/room-correction-filters/" target="_new">[% "PLUGIN_INGUZEQ_ROOMCORR" | string %]</a></span>
+			<span class="songInfoText">
+				<select class="stdedit" id="sel_Filter" onchange="setf(this.parentNode.parentNode)">
+					<option value="-">None</option>
+				</select>
+			</span>
+		</div>
+
+		<div id="control_Matrix">
+			<span class="songInfoTitle"><a href="http://inguzaudio.com/usage/plugin/settings/enhanced-stereo-filters/" target="_new">[% "PLUGIN_INGUZEQ_MATRIX" | string %]</a></span>
+			<span class="songInfoText">
+				<select class="stdedit" id="sel_Matrix" onchange="setf(this.parentNode.parentNode)">
+					<option value="-">None</option>
+				</select>
+			</span>
+		</div>
+	[% END %]
+
+	[% WRAPPER settingSection %]&nbsp;
+		[% WRAPPER settingGroup title="PLUGIN_INGUZEQ_HTML_PRESETS" %][% END %]
+
+		<div id="control_Preset">
+			<span class="songInfoTitle"><a href="http://inguzaudio.com/usage/plugin/presets/" target="_new">[% "PLUGIN_INGUZEQ_CHOOSE_PRESET" | string %]</a></span>
+			<span class="songInfoText">
+				<select class="stdedit" id="sel_Preset" onchange="setf(this.parentNode.parentNode)">
+					<option value="-">None</option>
+				</select>
+			</span>
+		</div>
+
+		<div id="control_NewPreset">
+			<span class="songInfoTitle">[% "PLUGIN_INGUZEQ_SAVEPRESETFILE" | string %]</span>
+			<span class="songInfoText">
+				<input class="stdedit" id="edt_NewPreset" value="blah" />
+				<input class="stdclick" type="button" name="btn_NewPreset" onclick="savp(this.parentNode.parentNode)"></input>
+			</span>
+		</div>
+	[% END %]
+
+	[% WRAPPER settingSection %]&nbsp;
+		[% WRAPPER settingGroup title="PLUGIN_INGUZEQ_HTML_ADVANCED" %][% END %]
+
+		<div id="control_Skew" inc="1">
+			<span class="songInfoTitle"><a href="http://inguzaudio.com/usage/plugin/settings/skew/" target="_new">[% "PLUGIN_INGUZEQ_SKEW" | string %]</a></span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="dn(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="up(this.parentNode.parentNode)" />
+				<span id="val_Skew"></span>&nbsp;[% "PLUGIN_INGUZEQ_SAMPLES" | string %]
+			</span>
+		</div>
+
+		<div id="control_Amb">
+			<span class="songInfoTitle"><a href="http://inguzaudio.com/usage/plugin/settings/ambisonic/" target="_new">[% "PLUGIN_INGUZEQ_AMBI_DECODE" | string %]</a></span>
+			<span class="songInfoText">
+				<select class="stdedit" id="sel_Amb" onchange="setf(this.parentNode.parentNode)">
+					<option value="UHJ">[% "PLUGIN_INGUZEQ_AMBI_UHJ" | string %]</option>
+					<option value="Blumlein">[% "PLUGIN_INGUZEQ_AMBI_BLUMLEIN" | string %]</option>
+					<option value="Crossed">[% "PLUGIN_INGUZEQ_AMBI_CARDIOID" | string %]</option>
+<!--
+					<option value="Crossed+jW">[% "PLUGIN_INGUZEQ_AMBI_CARDIOID_PLUSJW" | string %]</option>
+-->
+				</select>
+			</span>
+		</div>
+		<div id="control_AmbAngle" inc="5" style="display:none">
+			<span class="songInfoTitle">[% "PLUGIN_INGUZEQ_AMBI_CARDIOID_ANGLE" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="dn(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="up(this.parentNode.parentNode)" />
+				<span id="val_AmbAngle"></span>&nbsp;[% "PLUGIN_INGUZEQ_DEGREES" | string %]
+			</span>
+		</div>
+		<div id="control_AmbDirect" inc="0.1" style="display:none">
+			<span class="songInfoTitle">[% "PLUGIN_INGUZEQ_AMBI_CARDIOID_DIRECT" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="dn(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="up(this.parentNode.parentNode)" />
+				<span id="val_AmbDirect"></span>&nbsp;
+			</span>
+		</div>
+<!--
+		<div id="control_AmbjW" inc="0.05" style="display:none">
+			<span class="songInfoTitle">[% "PLUGIN_INGUZEQ_AMBI_CARDIOID_JW" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="dn(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="up(this.parentNode.parentNode)" />
+				<span id="val_AmbjW"></span>&nbsp;
+			</span>
+		</div>
+-->
+		<div id="control_AmbRotateZ" inc="1">
+			<span class="songInfoTitle">[% "PLUGIN_INGUZEQ_AMBI_ROTATION" | string %]</span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="dn(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="up(this.parentNode.parentNode)" />
+				<span id="val_AmbRotateZ"></span>&nbsp;[% "PLUGIN_INGUZEQ_DEGREES" | string %]&nbsp;-&nbsp;[% "PLUGIN_INGUZEQ_AMBI_ROTATION_Z" | string %]
+			</span>
+		</div>
+		<div id="control_AmbRotateY" inc="1">
+			<span class="songInfoTitle"></span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="dn(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="up(this.parentNode.parentNode)" />
+				<span id="val_AmbRotateY"></span>&nbsp;[% "PLUGIN_INGUZEQ_DEGREES" | string %]&nbsp;-&nbsp;[% "PLUGIN_INGUZEQ_AMBI_ROTATION_Y" | string %]
+			</span>
+		</div>
+		<div id="control_AmbRotateX" inc="1">
+			<span class="songInfoTitle"></span>
+			<span class="songInfoText">
+				<img align="center" src="/html/images/b_down.gif" style="cursor:hand" onclick="dn(this.parentNode.parentNode)" />
+				<img align="center" src="/html/images/b_up.gif" style="cursor:hand" onclick="up(this.parentNode.parentNode)" />
+				<span id="val_AmbRotateX"></span>&nbsp;[% "PLUGIN_INGUZEQ_DEGREES" | string %]&nbsp;-&nbsp;[% "PLUGIN_INGUZEQ_AMBI_ROTATION_X" | string %]
+			</span>
+		</div>
+	[% END %]
+
+
+
+
+	<!-- end of page -->
+	[% END %]
+
+<script type="text/javascript">
+//<![CDATA[
+window.setTimeout(doLoad,1500);
+//]]>
+</script>
+
+[% PROCESS pagefooter.html %]

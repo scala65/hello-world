@@ -1,0 +1,61 @@
+<Canvas
+  xmlns="http://schemas.microsoft.com/client/2007"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	Loaded="slLoaded" MouseMove="onSceneMouseMove" MouseLeftButtonUp="onSceneMouseUp">
+
+  <!--
+	Silverlight XAML container for displaying and editing curves
+	Part of the InguzEQ plugin, http://inguzaudio.com/EQ/
+	This file is licensed to you under the terms described in "Plugin.pm"
+	
+	Copyright (c) 2006-2009 by Hugh Pyle, inguzaudio.com, and contributors.
+  -->
+  
+  <Canvas Name="inguzLogo" Canvas.Top="14" Canvas.Left="757" Canvas.ZIndex="99" MouseLeftButtonDown="logoclick">
+	<Canvas.Resources>
+	  <Storyboard Name="anim1">
+		<DoubleAnimation Storyboard.TargetName="ng1" Storyboard.TargetProperty="(Canvas.Left)" To="80" Duration="0:0:0.5" />
+		<DoubleAnimation Storyboard.TargetName="ng2" Storyboard.TargetProperty="(Canvas.Left)" To="-80" Duration="0:0:0.5" />
+		<DoubleAnimation Storyboard.TargetName="box" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.5" />
+		<DoubleAnimationUsingKeyFrames Storyboard.TargetName="info" Storyboard.TargetProperty="Opacity" Duration="0:0:0.5">
+		  <SplineDoubleKeyFrame KeySpline="0.6,0.0 0.9,0.00" Value="1" KeyTime="0:0:0.5"/>
+		</DoubleAnimationUsingKeyFrames>
+	  </Storyboard>
+	  <Storyboard Name="anim2">
+		<DoubleAnimation Storyboard.TargetName="box" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.5" />
+		<DoubleAnimation Storyboard.TargetName="ng1" Storyboard.TargetProperty="(Canvas.Left)" To="0" Duration="0:0:0.5" />
+		<DoubleAnimation Storyboard.TargetName="ng2" Storyboard.TargetProperty="(Canvas.Left)" To="0" Duration="0:0:0.5" />
+		<DoubleAnimation Storyboard.TargetName="info" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.5" />
+	  </Storyboard>
+	</Canvas.Resources>
+	<Canvas.RenderTransform>
+	  <ScaleTransform Name="logort" CenterX="35" CenterY="-5" ScaleX="1" ScaleY="1" />
+	</Canvas.RenderTransform>
+	<Canvas Name="ng">
+	  <Canvas.RenderTransform>
+		<ScaleTransform ScaleX="0.3" ScaleY="0.3" />
+	  </Canvas.RenderTransform>
+	  <Rectangle Name="box" Canvas.Left="0" Canvas.Top="0" Width="100" Height="100" Fill="#FFFFFF" Stroke="#000000" StrokeThickness="3" />
+	  <Polyline Name="ng1" Points="23,18 70,50 23,82" Stroke="#000000" StrokeThickness="4" Canvas.Left="0" Canvas.Top="0">
+		<Polyline.Clip>
+		  <RectangleGeometry Rect="25,10 50 80" />
+		</Polyline.Clip>
+	  </Polyline>
+	  <Polyline Name="ng2" Points="77,18 30,50 77,82" Stroke="#000000" StrokeThickness="4" Canvas.Left="0" Canvas.Top="0">
+		<Polyline.Clip>
+		  <RectangleGeometry Rect="25,10 50 80" />
+		</Polyline.Clip>
+	  </Polyline>
+	</Canvas>
+	<Canvas Name="info" Opacity="0">
+	  <TextBlock Name="tb1" Text="inguz" FontSize="11" FontFamily="Verdana" Foreground="#000000" Canvas.Left="0.1" Canvas.Top="-0.5">
+	  </TextBlock>
+	  <TextBlock Name="tb2" Text="audio" FontSize="11" FontFamily="Verdana" Foreground="#000000" Canvas.Left="-0.1" Canvas.Top="14">
+	  </TextBlock>
+	</Canvas>
+  </Canvas>
+  
+  <Canvas Name="axisArea" />
+  <Canvas Name="graphArea" />
+  
+</Canvas>
